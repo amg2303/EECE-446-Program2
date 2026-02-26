@@ -49,7 +49,45 @@ int lookup_and_connect(const char *host, const char *service)
         return -1;
     }
     freeaddrinfo(result);
-    return s;
+:while () {
+  
+}    return s;
+}
+
+void search()
+{
+
+}
+
+void join()
+{
+
+}
+
+void publish()
+{
+
+}
+
+int main()
+{
+  string command;
+  cout << "Enter a command: " << endl;
+  cin >> command;
+  switch(command)
+  {
+    case "SEARCH":
+      //run search
+      break;
+    case "JOIN":
+      //run JOIN
+    break;
+      case "PUBLISH":
+      break;
+    case "EXIT":
+      return 0;
+    break;
+  }
 }
 
 int main(int argc, char *argv[])
