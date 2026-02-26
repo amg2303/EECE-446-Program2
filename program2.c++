@@ -56,7 +56,18 @@ void join(int sockfd, uint32_t peer_id)
 
 void publish(int sockfd)
 {
+    vector<string> files;
+    namespace fs = filesystem;
 
+    path dir("SharedFiles");
+    if (exists(dir) && is_directory(dir))
+            {
+                for (auto &e : directory_iterator(dir))
+                {
+                    if (e.is_regular_file())
+                        files.push_back(e.path().filename().string());
+                }
+            }
 }
 
 void exit(int sockfd)
