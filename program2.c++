@@ -69,6 +69,26 @@ void publish()
 
 }
 
+/**
+ * Send the entire buffer to a socket
+ *
+ * @return Total bytes sent, or -1 on error.
+ */
+int send_all(int sockfd, const char *buf, int len)
+{
+    int total = 0;
+    while (total < len)
+    {
+        int sent = send(sockfd, buf + total, len - total, 0);
+        if (sent == -1)
+        {
+            return -1;
+        }
+        total += sent;
+    }
+    return total;
+}
+
 int main()
 {
   string command;
