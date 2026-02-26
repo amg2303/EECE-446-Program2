@@ -47,6 +47,22 @@ void search(int sockfd)
     string filename;
     cout << "Enter a file name: " << endl;
     cin >> filename;
+
+    vector<char> buff;
+
+    buff.pushback('2');
+    buff.push_back(filename);
+
+    if(sendall(sockfd, buff, buff.size() == -1))
+    {
+        cerr << "Error searching" << endl;
+    }
+
+    uint8_t response[10];
+    recv(sockfd, response, 10);
+
+    cout << "File found at" << endl;
+    cout << "   " << 
 }
 
 void join(int sockfd, uint32_t peer_id)
