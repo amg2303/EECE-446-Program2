@@ -76,7 +76,7 @@ int send_all(int sockfd, const char *buf, int len)
     }
     return total;
 }
-
+int recv(int sockfd, void *buf, int len) {}
 int main()
 {
   string command;
@@ -101,20 +101,20 @@ int main()
 int main(int argc, char *argv[])
 {
     // Ensure the arguments is only ./h1-counter and then the chunk size.
-    if (argc != 2)
-    {
-        cout << "Too little or too much line arguments, please do 2 arguments" << endl;
-        return 1;
-    }
-
-    int chunkSize = atoi(argv[1]);
+    //if (argc != 2)
+    //{
+    //    cout << "Too little or too much line arguments, please do 2 arguments" << endl;
+    //    return 1;
+    //}
+//
+    //int chunkSize = atoi(argv[1]);
 
     // Ensure the chunk size is between 1 - 1000 (0B makes no sense).
-    if (chunkSize <= 0 || chunkSize > 1000)
-    {
-        cout << "Invalid chunk size\n";
-        return 1;
-    }
+    //if (chunkSize <= 0 || chunkSize > 1000)
+    //{
+    //    cout << "Invalid chunk size\n";
+     //   return 1;
+    //}
 
     // Connect to the server/port.
     int sockfd = lookup_and_connect(SERVER, PORT);
@@ -123,24 +123,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // HTTP/1.0 request (simple: no Host header needed for many servers).
-    const char request[] = "GET /~kkredo/file.html HTTP/1.0\r\n\r\n";
-
-    // Send the request.
-    if (send_all(sockfd, request, static_cast<int>(strlen(request))) == -1)
-    {
-        cout << "Error sending request\n";
-        close(sockfd);
-        return 1;
-    }
-
-    if (recv_all(sockfd, chunkSize) == -1)
-    {
-        cout << "Error recieving file\n";
-        close(sockfd);
-        return -1;
-    }
-
+   
     close(sockfd);
     return 0;
 }
