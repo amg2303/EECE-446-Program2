@@ -8,50 +8,38 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// Target HTTP server.
-#define SERVER "www.ecst.csuchico.edu"
-#define PORT "80"
 
 using namespace std;
 
 int lookup_and_connect(const char *host, const char *service)
 {
-    struct addrinfo hints;
-    struct addrinfo *rp, *result;
-    int s;
-    /* Translate host name into peer's IP address */
-    memset(&hints, 0, sizeof(hints));
+    addrinfo hints{};              // zero-initialize without memset
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = 0;
-    hints.ai_protocol = 0;
-    if ((s = getaddrinfo(host, service, &hints, &result)) != 0)
+
+    addrinfo *result = nullptr;
+    int s = getaddrinfo(host, service, &hints, &result);
+    if (s != 0)
     {
-        fprintf(stderr, "stream-talk-client: getaddrinfo: %s\n", gai_strerror(s));
+        cerr << "getaddrinfo: " << gai_strerror(s) << "\n";
         return -1;
     }
-    /* Iterate through the address list and try to connect */
-    for (rp = result; rp != NULL; rp = rp->ai_next)
+
+    int sockfd = -1;
+    for (addrinfo *rp = result; rp != nullptr; rp = rp->ai_next)
     {
-        if ((s = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1)
-        {
-            continue;
-        }
-        if (connect(s, rp->ai_addr, rp->ai_addrlen) != -1)
-        {
-            break;
-        }
-        close(s);
+        sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (sockfd == -1) continue;
+
+        if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) break;
+
+        close(sockfd);
+        sockfd = -1;
     }
-    if (rp == NULL)
-    {
-        perror("stream-talk-client: connect");
-        return -1;
-    }
+
     freeaddrinfo(result);
-:while () {
-  
-}    return s;
+    if (sockfd == -1) perror("connect");
+    return sockfd;
 }
 
 void search()
