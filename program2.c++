@@ -42,17 +42,24 @@ int lookup_and_connect(const char *host, const char *service)
     return sockfd;
 }
 
-void search()
+void search(int sockfd)
+{
+    string filename;
+    cout << "Enter a file name: " << endl;
+    cin >> filename;
+}
+
+void join(int sockfd, uint32_t peer_id)
 {
 
 }
 
-void join()
+void publish(int sockfd)
 {
 
 }
 
-void publish()
+void exit(int sockfd)
 {
 
 }
@@ -76,44 +83,26 @@ int send_all(int sockfd, const char *buf, int len)
     }
     return total;
 }
+
 int recv(int sockfd, void *buf, int len) {}
-int main()
-{
-  string command;
-  cout << "Enter a command: " << endl;
-  cin >> command;
-  switch(command)
-  {
-    case "SEARCH":
-      //run search
-      break;
-    case "JOIN":
-      //run JOIN
-    break;
-      case "PUBLISH":
-      break;
-    case "EXIT":
-      return 0;
-    break;
-  }
-}
 
 int main(int argc, char *argv[])
 {
     // Ensure the arguments is only ./h1-counter and then the chunk size.
-    //if (argc != 2)
-    //{
-    //    cout << "Too little or too much line arguments, please do 2 arguments" << endl;
-    //    return 1;
-    //}
-//
-    //int chunkSize = atoi(argv[1]);
+    if (argc != 2)
+    {
+        cout << "Too little or too much line arguments, please do 2 arguments" << endl;
+        return 1;
+    }
+
+    int chunkSize = atoi(argv[1]);
+    uint32_t peer_id = atoi(argv[2]);
 
     // Ensure the chunk size is between 1 - 1000 (0B makes no sense).
     //if (chunkSize <= 0 || chunkSize > 1000)
     //{
     //    cout << "Invalid chunk size\n";
-     //   return 1;
+    //    return 1;
     //}
 
     // Connect to the server/port.
@@ -123,8 +112,47 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-   
+    string command;
+    while(true)
+    {
+        cout << "Enter a command: " << endl;
+        cin >> command;
+        if(command == "SEARCH")
+        {
+            search(sockfd);
+        }
+        else if(command == "JOIN")
+        {
+            join(sockfd, peer_id);
+        }
+        else if(command == "PUBLISH")
+        {
+            publish(sockfd);
+        }
+        else if(command == "EXIT")
+        {
+            exit(sockfd);
+        }
+    }
+
+    // HTTP/1.0 request (simple: no Host header needed for many servers).
+    const char request[] = "GET /~kkredo/file.html HTTP/1.0\r\n\r\n";
+
+    // Send the request.
+    if (send_all(sockfd, request, static_cast<int>(strlen(request))) == -1)
+    {
+        cout << "Error sending request\n";
+        close(sockfd);
+        return 1;
+    }
+
+    if (recv_all(sockfd, chunkSize) == -1)
+    {
+        cout << "Error recieving file\n";
+        close(sockfd);
+        return -1;
+    }
+
     close(sockfd);
     return 0;
 }
-
