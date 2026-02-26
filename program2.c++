@@ -135,24 +135,5 @@ int main(int argc, char *argv[])
         }
     }
 
-    // HTTP/1.0 request (simple: no Host header needed for many servers).
-    const char request[] = "GET /~kkredo/file.html HTTP/1.0\r\n\r\n";
-
-    // Send the request.
-    if (send_all(sockfd, request, static_cast<int>(strlen(request))) == -1)
-    {
-        cout << "Error sending request\n";
-        close(sockfd);
-        return 1;
-    }
-
-    if (recv_all(sockfd, chunkSize) == -1)
-    {
-        cout << "Error recieving file\n";
-        close(sockfd);
-        return -1;
-    }
-
     close(sockfd);
-    return 0;
 }
