@@ -146,7 +146,6 @@ void search(int sockfd)
     cout << "File found at\n";
     cout << "Peer " << peer_id << endl;
     cout << ip_str << ":" << port << endl;
-    exit(sockfd);
 }
 
 void join(int sockfd, uint32_t peer_id)
@@ -154,12 +153,10 @@ void join(int sockfd, uint32_t peer_id)
     char buffer[5];
     buffer[0] = 0; 
 
-    uint32_t net_id = htonl(peer_id);
-
-    buffer[1] = (net_id >> 24) & 0xFF;
-    buffer[2] = (net_id >> 16) & 0xFF;
-    buffer[3] = (net_id >> 8) & 0xFF;
-    buffer[4] = net_id & 0xFF;
+    buffer[1] = (peer_id >> 24) & 0xFF;
+    buffer[2] = (peer_id >> 16) & 0xFF;
+    buffer[3] = (peer_id >> 8) & 0xFF;
+    buffer[4] = peer_id & 0xFF;
 
     if (send_all(sockfd, buffer, 5) == -1)
     {
@@ -170,40 +167,44 @@ void join(int sockfd, uint32_t peer_id)
 void publish(int s)
 {
     char action_code = 0x01;
-      long count = 0; // number of files to show
-      vector<string> files;
-      int size = 5; 
+    uint32_t count = 0;
+    vector<string> files;
+    int size = 5;
 
-      for(const auto& iterator : filesystem::directory_iterator("./SharedFiles/")){//gets into the directory and gets the files and places it in the vector
-        string current_file = iterator.path().filename().string() + '\0'; 
-        files.push_back(current_file);
-        count++;
-      }
+    for (const auto& iterator : filesystem::directory_iterator("./SharedFiles/"))
+    {
+        if (iterator.is_regular_file())
+        {
+            string current_file = iterator.path().filename().string();
+            files.push_back(current_file);
+            count++;
+        }
+    }
 
-      for(string temp_file : files){//gets the size of the files and adds it to the size
-        size += temp_file.size();
-      }
+    for (string temp_file : files)
+    {
+        size += temp_file.size() + 1;
+    }
 
-      char* buffer = new char[size];
+    char* buffer = new char[size];
 
-      // place action code manually
-      buffer[0] = action_code;
+    buffer[0] = action_code;
 
-      // place count as 4 big-endian bytes manually
-      uint32_t net_count = htonl(count);
-      buffer[1] = (net_count >> 24) & 0xFF;
-      buffer[2] = (net_count >> 16) & 0xFF;
-      buffer[3] = (net_count >> 8)  & 0xFF;
-      buffer[4] =  net_count        & 0xFF;
+    buffer[1] = (count >> 24) & 0xFF;
+    buffer[2] = (count >> 16) & 0xFF;
+    buffer[3] = (count >> 8)  & 0xFF;
+    buffer[4] = count & 0xFF;
 
-      //creates a boundry that is used as an index to place the file name
-      int boundary = 5; 
-      for(string file_name: files){
+    int boundary = 5;
+
+    for (string file_name : files)
+    {
         strcpy(buffer + boundary, file_name.c_str());
-        boundary += file_name.size();
-      }
+        boundary += file_name.size() + 1;
+    }
 
-      send_all(s, buffer, size);
+    send_all(s, buffer, size);
+    delete[] buffer;
 }
 
 
@@ -242,25 +243,26 @@ int main(int argc, char *argv[])
 
     string command;
     while(true)
+{
+    cout << "Enter a command: ";
+    cin >> command;
+
+    if(command == "SEARCH")
     {
-        cout << "Enter a command: " << endl;
-        cin >> command;
-        if(command == "SEARCH")
-        {
-            search(sockfd);
-            close(sockfd);
-        }
-        else if(command == "JOIN")
-        {
-            join(sockfd, peer_id);
-        }
-        else if(command == "PUBLISH")
-        {
-            publish(sockfd);
-        }
-        else if(command == "EXIT")
-        {
-            close(sockfd);
-        }
+        search(sockfd);
     }
+    else if(command == "JOIN")
+    {
+        join(sockfd, peer_id);
+    }
+    else if(command == "PUBLISH")
+    {
+        publish(sockfd);
+    }
+    else if(command == "EXIT")
+    {
+        close(sockfd);
+        return 0;
+    }
+}
 }
