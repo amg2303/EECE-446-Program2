@@ -144,7 +144,7 @@ void publish(int sockfd)
 
 void exit(int sockfd)
 {
-
+    close(sockfd);
 }
 
 /**
@@ -167,7 +167,24 @@ int send_all(int sockfd, const char *buf, int len)
     return total;
 }
 
-int recv(int sockfd, void *buf, int len) {}
+int recv_helper(int s, void *buf, int response_size) {
+int total_recieved = 0;
+
+	while (total_recieved < response_size){ //have to ensure we continue until total_recieve matches chunk_size
+		int n = recv(s, buf + total_recieved, response_size - total_recieved, 0);
+		if (n == 0){ //we stop here
+			break;
+		}
+		 if (n < 0){  //error
+			return -1;
+		}
+		total_recieved += n; //increment
+	}
+
+	buff[total_recieved] = '\0'; // add a terminator that way we dont get past the chunk_size
+	return total_recieved;
+    
+}
 
 int main(int argc, char *argv[])
 {
