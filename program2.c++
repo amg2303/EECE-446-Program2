@@ -45,29 +45,85 @@ int lookup_and_connect(const char *host, const char *service)
 void search(int sockfd)
 {
     string filename;
-    cout << "Enter a file name: " << endl;
+    cout << "Enter a file name: ";
     cin >> filename;
+    vector<char> buffer;
 
-    vector<char> buff;
+    buffer.push_back(2);
 
-    buff.pushback('2');
-    buff.push_back(filename);
-
-    if(sendall(sockfd, buff, buff.size() == -1))
+    for (char c : filename)
     {
-        cerr << "Error searching" << endl;
+        buffer.push_back(c);
+    }
+
+    buffer.push_back('\0');
+
+    if (send_all(sockfd, buffer.data(), buffer.size()) == -1)
+    {
+        cout << "Error sending SEARCH request\n";
+        return;
     }
 
     uint8_t response[10];
-    recv(sockfd, response, 10);
 
-    cout << "File found at" << endl;
-    cout << "   " << 
+    if (recv_all(sockfd, response, 10) == -1)
+    {
+        cout << "Error receiving SEARCH response\n";
+        return;
+    }
+
+    //parsing the peer id without memcpy (I had to look up how to do this lol)
+    uint32_t peer_id =
+        (static_cast<uint32_t>(response[0]) << 24) |
+        (static_cast<uint32_t>(response[1]) << 16) |
+        (static_cast<uint32_t>(response[2]) << 8)  |
+        (static_cast<uint32_t>(response[3]));
+
+    //Doing same for ip    
+    uint32_t ip =
+        (static_cast<uint32_t>(response[4]) << 24) |
+        (static_cast<uint32_t>(response[5]) << 16) |
+        (static_cast<uint32_t>(response[6]) << 8)  |
+        (static_cast<uint32_t>(response[7]));
+
+    //Same thing for port #
+    uint16_t port =
+        (static_cast<uint16_t>(response[8]) << 8) |
+        (static_cast<uint16_t>(response[9]));
+
+    if (peer_id == 0)
+    {
+        cout << "File not indexed by registry\n";
+        return;
+    }
+
+    struct in_addr addr;
+    addr.s_addr = htonl(ip);
+
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN);
+
+    cout << "File found at\n";
+    cout << "Peer " << peer_id << endl;
+    cout << ip_str << ":" << port << endl;
 }
 
 void join(int sockfd, uint32_t peer_id)
 {
+    char buffer[5];
+    buffer[0] = 0; 
 
+    uint32_t net_id = htonl(peer_id);
+
+    buffer[1] = (net_id >> 24) & 0xFF;
+    buffer[2] = (net_id >> 16) & 0xFF;
+    buffer[3] = (net_id >> 8) & 0xFF;
+    buffer[4] = net_id & 0xFF;
+
+    if (send_all(sockfd, buffer, 5) == -1)
+    {
+        cout << "Error sending JOIN request\n";
+    }
 }
 
 void publish(int sockfd)
