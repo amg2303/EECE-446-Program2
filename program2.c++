@@ -2,14 +2,54 @@
 #include <cstring>
 #include <iostream>
 #include <vector>
+#include <filesystem>
+#include <cstdint>
 
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 
 using namespace std;
+
+int recv_helper(int s, void *buf, int response_size)
+{
+    int total_received = 0;
+    char *buffer = (char *)buf;
+
+    while (total_received < response_size)
+    {
+        int n = recv(s, buffer + total_received,
+                     response_size - total_received, 0);
+
+        if (n == 0)
+            break;
+
+        if (n < 0)
+            return -1;
+
+        total_received += n;
+    }
+
+    return total_received;
+}
+
+int send_all(int sockfd, const char *buf, int len)
+{
+    int total = 0;
+    while (total < len)
+    {
+        int sent = send(sockfd, buf + total, len - total, 0);
+        if (sent == -1)
+        {
+            return -1;
+        }
+        total += sent;
+    }
+    return total;
+}
 
 int lookup_and_connect(const char *host, const char *service)
 {
@@ -127,77 +167,64 @@ void join(int sockfd, uint32_t peer_id)
     }
 }
 
-void publish(int sockfd)
+void publish(int s)
 {
-    vector<string> files;
-    namespace fs = filesystem;
+    char action_code = 0x01;
+      long count = 0; // number of files to show
+      vector<string> files;
+      int size = 5; 
 
-    path dir("SharedFiles");
-    if (exists(dir) && is_directory(dir))
-            {
-                for (auto &e : directory_iterator(dir))
-                {
-                    if (e.is_regular_file())
-                        files.push_back(e.path().filename().string());
-                }
-            }
+      for(const auto& iterator : filesystem::directory_iterator("./SharedFiles/")){//gets into the directory and gets the files and places it in the vector
+        string current_file = iterator.path().filename().string() + '\0'; 
+        files.push_back(current_file);
+        count++;
+      }
+
+      for(string temp_file : files){//gets the size of the files and adds it to the size
+        size += temp_file.size();
+      }
+
+      char* buffer = new char[size];
+
+      // place action code manually
+      buffer[0] = action_code;
+
+      // place count as 4 big-endian bytes manually
+      uint32_t net_count = htonl(count);
+      buffer[1] = (net_count >> 24) & 0xFF;
+      buffer[2] = (net_count >> 16) & 0xFF;
+      buffer[3] = (net_count >> 8)  & 0xFF;
+      buffer[4] =  net_count        & 0xFF;
+
+      //creates a boundry that is used as an index to place the file name
+      int boundary = 5; 
+      for(string file_name: files){
+        strcpy(buffer + boundary, file_name.c_str());
+        boundary += file_name.size();
+      }
+
+      send_all(s, buffer, size);
 }
 
-void exit(int sockfd)
-{
-    close(sockfd);
-}
 
 /**
  * Send the entire buffer to a socket
  *
  * @return Total bytes sent, or -1 on error.
  */
-int send_all(int sockfd, const char *buf, int len)
-{
-    int total = 0;
-    while (total < len)
-    {
-        int sent = send(sockfd, buf + total, len - total, 0);
-        if (sent == -1)
-        {
-            return -1;
-        }
-        total += sent;
-    }
-    return total;
-}
-
-int recv_helper(int s, void *buf, int response_size) {
-int total_recieved = 0;
-
-	while (total_recieved < response_size){ //have to ensure we continue until total_recieve matches chunk_size
-		int n = recv(s, buf + total_recieved, response_size - total_recieved, 0);
-		if (n == 0){ //we stop here
-			break;
-		}
-		 if (n < 0){  //error
-			return -1;
-		}
-		total_recieved += n; //increment
-	}
-
-	buff[total_recieved] = '\0'; // add a terminator that way we dont get past the chunk_size
-	return total_recieved;
-    
-}
 
 int main(int argc, char *argv[])
 {
     // Ensure the arguments is only ./h1-counter and then the chunk size.
-    if (argc != 2)
+    if (argc != 4)
     {
         cout << "Too little or too much line arguments, please do 2 arguments" << endl;
         return 1;
     }
 
-    int chunkSize = atoi(argv[1]);
-    uint32_t peer_id = atoi(argv[2]);
+    const char* host = argv[1];
+    const char* port = argv[2];
+    uint32_t peer_id = atoi(argv[3]);
 
     // Ensure the chunk size is between 1 - 1000 (0B makes no sense).
     //if (chunkSize <= 0 || chunkSize > 1000)
@@ -207,7 +234,7 @@ int main(int argc, char *argv[])
     //}
 
     // Connect to the server/port.
-    int sockfd = lookup_and_connect(SERVER, PORT);
+    int sockfd = lookup_and_connect(host, port);
     if (sockfd < 0)
     {
         return 1;
@@ -221,6 +248,7 @@ int main(int argc, char *argv[])
         if(command == "SEARCH")
         {
             search(sockfd);
+            close(sockfd);
         }
         else if(command == "JOIN")
         {
@@ -232,9 +260,7 @@ int main(int argc, char *argv[])
         }
         else if(command == "EXIT")
         {
-            exit(sockfd);
+            close(sockfd);
         }
     }
-
-    close(sockfd);
 }
