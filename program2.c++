@@ -66,7 +66,7 @@ void search(int sockfd)
 
     uint8_t response[10];
 
-    if (recv_all(sockfd, response, 10) == -1)
+    if (recv_helper(sockfd, response, 10) == -1)
     {
         cout << "Error receiving SEARCH response\n";
         return;
@@ -106,6 +106,7 @@ void search(int sockfd)
     cout << "File found at\n";
     cout << "Peer " << peer_id << endl;
     cout << ip_str << ":" << port << endl;
+    exit(sockfd);
 }
 
 void join(int sockfd, uint32_t peer_id)
