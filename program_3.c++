@@ -16,6 +16,8 @@
 
 using namespace std;
 
+vector<uint32_t> search(int sockfd);
+
 int recv_helper(int s, void *buf, int response_size)
 {
     int total_received = 0;
@@ -84,12 +86,31 @@ int lookup_and_connect(const char *host, const char *service)
     return sockfd;
 }
 
-void search(int sockfd)
+void fetch(int s)
 {
     string filename;
     cout << "Enter a file name: ";
     cin >> filename;
     vector<char> buffer;
+    vector<uint32_t> res;
+    buffer.push_back(2);
+
+    for (char c : filename)
+    {
+        buffer.push_back(c);
+    }
+
+    buffer.push_back('\0');
+    res = search(s);
+}
+
+vector<uint32_t> search(int sockfd)
+{
+    string filename;
+    cout << "Enter a file name: ";
+    cin >> filename;
+    vector<char> buffer;
+    vector<uint32_t> res;
 
     buffer.push_back(2);
 
@@ -103,7 +124,7 @@ void search(int sockfd)
     if (send_all(sockfd, buffer.data(), buffer.size()) == -1)
     {
         cout << "Error sending SEARCH request\n";
-        return;
+        return {};
     }
 
     uint8_t response[10];
@@ -111,7 +132,7 @@ void search(int sockfd)
     if (recv_helper(sockfd, response, 10) == -1)
     {
         cout << "Error receiving SEARCH response\n";
-        return;
+        return {};
     }
 
     //parsing the peer id without memcpy (I had to look up how to do this lol)
@@ -136,7 +157,7 @@ void search(int sockfd)
     if (peer_id == 0)
     {
         cout << "File not indexed by registry\n";
-        return;
+        return {};
     }
 
     struct in_addr addr;
@@ -148,6 +169,10 @@ void search(int sockfd)
     cout << "File found at\n";
     cout << "Peer " << peer_id << endl;
     cout << ip_str << ":" << port << endl;
+
+    res.push_back(peer_id);
+    res.push_back(port);
+    return res;
 }
 
 void join(int sockfd, uint32_t peer_id)
@@ -253,6 +278,10 @@ int main(int argc, char *argv[])
     else if(command == "PUBLISH")
     {
         publish(sockfd);
+    }
+    else if(command == "FETCH")
+    {
+
     }
     else if(command == "EXIT")
     {
