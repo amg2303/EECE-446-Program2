@@ -122,11 +122,9 @@ static void handle_join(int s, std::vector<peer_entry> &peers)
     uint8_t buf[4];
     if (recv_all(s, buf, 4) <= 0) return;
 
-    uint32_t peer_id =
-        ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
-        ((uint32_t)buf[2] <<  8) |  (uint32_t)buf[3];
+    uint32_t peer_id = ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) | ((uint32_t)buf[2] <<  8) |  (uint32_t)buf[3];
 
-    // Look up if we already have an entry for this socket (e.g. re-JOIN).
+    // Look up if we already have an entry for this socket.
     // If not, create a new one.
     peer_entry *pe = find_peer_by_socket(peers, s);
     if (pe == nullptr) {
@@ -135,8 +133,7 @@ static void handle_join(int s, std::vector<peer_entry> &peers)
         pe->socket_descriptor = s;
         pe->file_count        = 0;
 
-        // Use getpeername to learn the peer's IP address and port number.
-        // This is required by the spec for SEARCH responses later.
+        // Use getpeername to learn the peers ip address and port number.
         socklen_t len = sizeof(pe->address);
         if (getpeername(s, (struct sockaddr *)&pe->address, &len) == -1)
             perror("getpeername");
@@ -150,18 +147,97 @@ static void handle_join(int s, std::vector<peer_entry> &peers)
 
 static void handle_publish(int s, std::vector<peer_entry> &peers)
 {
-    // TODO
-    (void)s;
-    (void)peers;
+    // Read the 4-byte file count
+    uint8_t buf[4];
+    if (recv_all(s, buf, 4) <= 0) return;
+ 
+    uint32_t file_count =
+        ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
+        ((uint32_t)buf[2] <<  8) |  (uint32_t)buf[3];
+ 
+    peer_entry *pe = find_peer_by_socket(peers, s);
+    if (pe == nullptr) return;
+ 
+    // Read each null-terminated filename
+    pe->file_count = 0;
+    for (uint32_t i = 0; i < file_count && i < MAX_FILES; i++) {
+        int j = 0;
+        char c;
+        while (recv_all(s, &c, 1) == 1 && c != '\0' && j < MAX_FILENAME_LEN - 1) {
+            pe->files[i][j++] = c;
+        }
+        pe->files[i][j] = '\0';
+        pe->file_count++;
+    }
+ 
+    // Print output
+    printf("TEST] PUBLISH %d", pe->file_count);
+    for (int i = 0; i < pe->file_count; i++)
+        printf(" %s", pe->files[i]);
+    printf("\n");
+    fflush(stdout);
 }
+
 
 
 static void handle_search(int s, std::vector<peer_entry> &peers)
 {
-    // TODO
-    (void)s;
-    (void)peers;
+    // Read filename one byte at a time
+    char filename[MAX_FILENAME_LEN];
+    int i = 0;
+    char c;
+    while (recv_all(s, &c, 1) == 1 && c != '\0' && i < MAX_FILENAME_LEN - 1) {
+        filename[i++] = c;
+    }
+    filename[i] = '\0';
+ 
+    // Search all peers for the file
+    peer_entry *found = nullptr;
+    for (auto &p : peers) {
+        for (int f = 0; f < p.file_count; f++) {
+            if (strcmp(p.files[f], filename) == 0) {
+                found = &p;
+                break;
+            }
+        }
+        if (found) break;
+    }
+ 
+    // Build and send response. All zeros if not found
+    char response[10] = {};
+    if (found) {
+        uint32_t id   = htonl(found->id);
+        uint32_t ip   = found->address.sin_addr.s_addr; // already network order
+        uint16_t port = found->address.sin_port;        // already network order
+ 
+        response[0] = (id   >> 24) & 0xFF;
+        response[1] = (id   >> 16) & 0xFF;
+        response[2] = (id   >>  8) & 0xFF;
+        response[3] =  id          & 0xFF;
+ 
+        response[4] = (ip   >> 24) & 0xFF;
+        response[5] = (ip   >> 16) & 0xFF;
+        response[6] = (ip   >>  8) & 0xFF;
+        response[7] =  ip          & 0xFF;
+ 
+        response[8] = (port >>  8) & 0xFF;
+        response[9] =  port        & 0xFF;
+    }
+    send_all(s, response, 10);
+ 
+    // Print output
+    char ip_str[INET_ADDRSTRLEN] = "0.0.0.0";
+    uint16_t port = 0;
+    uint32_t id   = 0;
+    if (found) {
+        inet_ntop(AF_INET, &found->address.sin_addr, ip_str, INET_ADDRSTRLEN);
+        port = ntohs(found->address.sin_port);
+        id   = found->id;
+    }
+    printf("TEST] SEARCH %s %u %s:%u\n", filename, id, ip_str, port);
+    fflush(stdout);
 }
+
 
 int main(int argc, char *argv[])
 {
